@@ -2,6 +2,7 @@ import { create } from "zustand"
 import type { GameState, Quest, Achievement, QuizSession, MiniGameScore, PlayerProfile } from "@/lib/types"
 import { saveGameState, loadGameState, createInitialGameState } from "@/lib/storage"
 import { checkAchievements } from "@/lib/achievements"
+import { getPersonalizedQuests, calculateImpactMetrics } from "@/lib/personalization"
 
 interface GameStore extends GameState {
   // Actions
@@ -17,11 +18,13 @@ interface GameStore extends GameState {
 
   // Computed values
   getAvailableQuests: () => Quest[]
+  getPersonalizedQuests: () => Quest[]
   getCompletedQuests: () => Quest[]
   getUnlockedAchievements: () => Achievement[]
   getCurrentLevel: () => number
   getXPForNextLevel: () => number
   getProgressToNextLevel: () => number
+  updateImpactMetrics: () => void
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -97,6 +100,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
         q.id === questId ? { ...q, status: "completed" as const, completedAt: new Date() } : q,
       )
 
+      // Calculate impact metrics
+      const completedQuests = updatedQuests.filter(q => q.status === "completed")
+      const impactMetrics = calculateImpactMetrics(completedQuests, state.player)
+
+      // Update weekly progress
+      const now = new Date()
+      const weekStart = new Date(state.player.weeklyTarget.weekStartDate)
+      const isCurrentWeek = now >= weekStart && now < new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+      
       const updatedPlayer = {
         ...state.player,
         totalXP: newXP,
@@ -105,7 +117,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
         stats: {
           ...state.player.stats,
           challengesCompleted: state.player.stats.challengesCompleted + 1,
+          co2Saved: impactMetrics.co2Saved,
+          moneySaved: impactMetrics.moneySaved,
+          treesEquivalent: impactMetrics.treesEquivalent,
         },
+        weeklyTarget: {
+          ...state.player.weeklyTarget,
+          currentWeekProgress: isCurrentWeek 
+            ? state.player.weeklyTarget.currentWeekProgress + 1
+            : 1,
+          weekStartDate: isCurrentWeek ? weekStart : now
+        }
       }
 
       const updatedAchievements = checkAchievements(
@@ -259,6 +281,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return state.quests.filter((q) => q.status === "available")
   },
 
+  getPersonalizedQuests: () => {
+    const state = get()
+    const availableQuests = state.quests.filter((q) => q.status === "available")
+    return getPersonalizedQuests(state.player, availableQuests)
+  },
+
   getCompletedQuests: () => {
     const state = get()
     return state.quests.filter((q) => q.status === "completed")
@@ -286,5 +314,30 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const nextLevelXP = state.getCurrentLevel() * 1000
     const progress = (state.player.totalXP - currentLevelXP) / (nextLevelXP - currentLevelXP)
     return Math.min(progress, 1)
+  },
+
+  updateImpactMetrics: () => {
+    set((state) => {
+      const completedQuests = state.quests.filter(q => q.status === "completed")
+      const impactMetrics = calculateImpactMetrics(completedQuests, state.player)
+      
+      const updatedPlayer = {
+        ...state.player,
+        stats: {
+          ...state.player.stats,
+          co2Saved: impactMetrics.co2Saved,
+          moneySaved: impactMetrics.moneySaved,
+          treesEquivalent: impactMetrics.treesEquivalent,
+        }
+      }
+
+      const newState = {
+        ...state,
+        player: updatedPlayer,
+      }
+
+      saveGameState(newState)
+      return newState
+    })
   },
 }))

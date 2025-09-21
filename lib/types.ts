@@ -1,6 +1,36 @@
+export interface UserPreferences {
+  interests: ("waste" | "water" | "energy" | "transport" | "biodiversity")[]
+  experienceLevel: "beginner" | "intermediate" | "advanced"
+  primaryGoals: ("reduce_waste" | "save_energy" | "conserve_water" | "sustainable_transport" | "protect_nature")[]
+  availableTime: "5-10min" | "10-20min" | "20-30min" | "30min+"
+  preferredActivities: ("challenges" | "quizzes" | "games" | "reading")[]
+  location?: {
+    country: string
+    region?: string
+    climate?: "tropical" | "temperate" | "arid" | "polar"
+  }
+  motivations: ("save_money" | "help_planet" | "learn_new_things" | "compete_friends" | "build_habits")[]
+}
+
+export interface PersonalGoal {
+  id: string
+  title: string
+  description: string
+  category: "waste" | "water" | "energy" | "transport" | "biodiversity"
+  targetValue: number
+  currentValue: number
+  unit: string
+  deadline: Date
+  isActive: boolean
+  createdAt: Date
+  completedAt?: Date
+}
+
 export interface PlayerProfile {
   id: string
   name: string
+  displayName?: string
+  avatar?: string
   level: number
   totalXP: number
   currentStreak: number
@@ -8,11 +38,22 @@ export interface PlayerProfile {
   joinedAt: Date
   lastActiveAt: Date
   theme: "light" | "dark"
+  isOnboardingComplete: boolean
+  preferences: UserPreferences
+  personalGoals: PersonalGoal[]
   stats: {
     challengesCompleted: number
     quizzesCompleted: number
     miniGamesPlayed: number
     badgesEarned: number
+    co2Saved: number // in kg
+    moneySaved: number // in local currency
+    treesEquivalent: number
+  }
+  weeklyTarget: {
+    challengesPerWeek: number
+    currentWeekProgress: number
+    weekStartDate: Date
   }
 }
 
